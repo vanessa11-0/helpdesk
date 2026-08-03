@@ -1,0 +1,14 @@
+<aside class="sidebar">
+    <nav class="sidebar-nav">
+        <ul>
+            @for (item of filteredMenuItems(); track item.routerLink) {
+            <li>
+                <a [routerLink]="item.routerLink" routerLinkActive="active">
+                    <span class="icon">{{ item.icon }}</span>
+                    <span class="label">{{ item.label }}</span>
+                </a>
+            </li>
+            }
+        </ul>
+    </nav>
+</aside>

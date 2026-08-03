@@ -1,0 +1,17 @@
+<header class="navbar">
+  <div class="navbar-brand">
+    <span class="brand-title">HelpDesk System</span>
+  </div>
+
+  <div class="navbar-user">
+    @if (currentUser()) {
+    <div class="user-info">
+      <span class="user-name">{{ currentUser()?.fullName }}</span>
+      <span class="user-role badge">{{ currentUser()?.role }}</span>
+    </div>
+    <button type="button" class="btn-logout" (click)="onLogout()">
+      Cerrar Sesión
+    </button>
+    }
+  </div>
+</header>
