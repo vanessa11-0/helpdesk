@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { authGuard } from './core/auth/guards/auth.guard';
-import { MainLayoutComponent } from './layout/components/main-layout/main-layout.component';
+import { authGuard } from './core/guards/auth.guard';
+import { roleGuard } from './core/guards/role.guard';
 
 const routes: Routes = [
   {
@@ -9,32 +9,29 @@ const routes: Routes = [
     loadChildren: () => import('./features/auth/auth.module').then(m => m.AuthModule)
   },
   {
-    path: '',
-    component: MainLayoutComponent,
+    path: 'dashboard',
     canActivate: [authGuard],
-    children: [
-      {
-        path: 'dashboard',
-        loadChildren: () => import('./features/dashboard/dashboard.module').then(m => m.DashboardModule)
-      },
-      {
-        path: 'tickets',
-        loadChildren: () => import('./features/tickets/tickets.module').then(m => m.TicketsModule)
-      },
-      {
-        path: 'users',
-        loadChildren: () => import('./features/users/users.module').then(m => m.UsersModule)
-      },
-      {
-        path: '',
-        redirectTo: 'dashboard',
-        pathMatch: 'full'
-      }
-    ]
+    loadChildren: () => import('./features/dashboard/dashboard.module').then(m => m.DashboardModule)
+  },
+  {
+    path: 'tickets',
+    canActivate: [authGuard],
+    loadChildren: () => import('./features/tickets/tickets.module').then(m => m.TicketsModule)
+  },
+  {
+    path: 'users',
+    canActivate: [authGuard, roleGuard],
+    data: { roles: ['ADMIN'] },
+    loadChildren: () => import('./features/users/users.module').then(m => m.UsersModule)
+  },
+  {
+    path: '',
+    redirectTo: 'dashboard',
+    pathMatch: 'full'
   },
   {
     path: '**',
-    redirectTo: 'auth'
+    redirectTo: 'dashboard'
   }
 ];
 

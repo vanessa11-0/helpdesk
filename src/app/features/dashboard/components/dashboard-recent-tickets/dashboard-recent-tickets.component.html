@@ -1,0 +1,21 @@
+<section class="recent-tickets">
+  <h3>Tickets recientes</h3>
+
+  @if (isLoading) {
+    <p>Cargando...</p>
+  } @else if (tickets.length === 0) {
+    <p>No hay tickets recientes.</p>
+  } @else {
+    <ul class="ticket-list">
+      @for (ticket of tickets; track ticket.id) {
+        <li class="ticket-item">
+          <div>
+            <strong>{{ ticket.title }}</strong>
+            <small>{{ ticket.status }}</small>
+          </div>
+          <span>{{ ticket.priority }}</span>
+        </li>
+      }
+    </ul>
+  }
+</section>

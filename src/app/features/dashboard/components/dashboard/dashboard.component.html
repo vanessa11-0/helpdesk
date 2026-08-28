@@ -1,0 +1,18 @@
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <h1>Bienvenido, {{ currentUser()?.fullName }}</h1>
+    <p class="role-badge">Panel de {{ currentUser()?.role }}</p>
+  </header>
+
+  @if (isLoading()) {
+    <div class="loading-state">Cargando métricas...</div>
+  } @else {
+    <!-- Tarjetas de Métricas -->
+    <app-dashboard-metrics [metrics]="metrics()"></app-dashboard-metrics>
+
+    <!-- Lista Resumen de Tickets Recientes -->
+    <div class="dashboard-content">
+      <app-dashboard-recent-tickets></app-dashboard-recent-tickets>
+    </div>
+  }
+</div>

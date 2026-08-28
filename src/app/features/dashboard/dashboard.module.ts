@@ -1,16 +1,25 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-
+import { RouterModule } from '@angular/router';
+import { DashboardHomeComponent } from './pages/dashboard-home/dashboard-home.component';
 import { DashboardRoutingModule } from './dashboard-routing.module';
-import { DashboardComponent } from './pages/dashboard/dashboard.component';
+import { DashboardComponent } from './components/dashboard/dashboard.component';
+import { DashboardMetricsComponent } from './components/dashboard-metrics/dashboard-metrics.component';
+import { DashboardRecentTicketsComponent } from './components/dashboard-recent-tickets/dashboard-recent-tickets.component';
+import { LayoutModule } from '../../layout/layout.module';
 
 @NgModule({
   declarations: [
-    DashboardComponent
+    DashboardHomeComponent,
+    DashboardComponent,
+    DashboardMetricsComponent,
+    DashboardRecentTicketsComponent
   ],
   imports: [
     CommonModule,
-    DashboardRoutingModule
+    RouterModule,
+    DashboardRoutingModule,
+    LayoutModule
   ]
 })
 export class DashboardModule { }

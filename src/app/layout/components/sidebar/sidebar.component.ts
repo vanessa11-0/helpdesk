@@ -1,47 +1,34 @@
-import { Component, computed } from '@angular/core'
-import { AuthService } from '../../../core/auth/services/auth.service'
-import { UserRole } from '../../../models/user.model'
+import { Component, inject, computed } from '@angular/core';
+import { AuthService } from '../../../core/auth/auth.service';
 
 interface MenuItem {
-  label: string
-  icon: string
-  routerLink: string
-  roles: UserRole[]
+  label: string;
+  icon: string;
+  route: string;
+  roles: string[];
 }
 
 @Component({
   selector: 'app-sidebar',
   templateUrl: './sidebar.component.html',
-  styleUrls: ['./sidebar.component.scss']
+
 })
 export class SidebarComponent {
-  currentRole = this.authService.currentRole
+  private readonly authService = inject(AuthService);
 
-  private menuItems: MenuItem[] = [
-    {
-      label: 'Dashboard',
-      icon: '📊',
-      routerLink: '/dashboard',
-      roles: [UserRole.CLIENT, UserRole.AGENT, UserRole.ADMIN]
-    },
-    {
-      label: 'Mis Tickets',
-      icon: '🎫',
-      routerLink: '/tickets',
-      roles: [UserRole.CLIENT, UserRole.AGENT, UserRole.ADMIN]
-    },
-    {
-      label: 'Gestión de Usuarios',
-      icon: '👥',
-      routerLink: '/users',
-      roles: [UserRole.ADMIN]
-    }
-  ]
-  filteredMenuItems = computed(() => {
-    const role = this.currentRole()
-    if (!role) return []
-    return this.menuItems.filter(item => item.roles.includes(role))
-  })
+  private readonly allMenuItems: MenuItem[] = [
+    { label: 'Dashboard', icon: 'chart-pie', route: '/dashboard', roles: ['CLIENT', 'AGENT', 'ADMIN'] },
+    { label: 'Mis Tickets', icon: 'ticket', route: '/tickets/my-tickets', roles: ['CLIENT'] },
+    { label: 'Crear Ticket', icon: 'plus-circle', route: '/tickets/create', roles: ['CLIENT'] },
+    { label: 'Tickets Asignados', icon: 'user-check', route: '/tickets/assigned', roles: ['AGENT'] },
+    { label: 'Tickets Disponibles', icon: 'inbox', route: '/tickets/unassigned', roles: ['AGENT'] },
+    { label: 'Todos los Tickets', icon: 'collection', route: '/tickets', roles: ['ADMIN'] },
+    { label: 'Usuarios', icon: 'users', route: '/users', roles: ['ADMIN'] }
+  ];
 
-  constructor (private authService: AuthService) {}
+  readonly menuItems = computed(() => {
+    const role = this.authService.userRole();
+    if (!role) return [];
+    return this.allMenuItems.filter(item => item.roles.includes(role));
+  });
 }

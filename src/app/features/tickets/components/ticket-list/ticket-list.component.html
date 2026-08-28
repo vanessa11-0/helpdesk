@@ -1,0 +1,119 @@
+<div class="tickets-container">
+  <header class="tickets-header">
+    <div>
+      <h1>Mapeo y Gestión de Tickets</h1>
+      <p class="subtitle">Seguimiento de solicitudes de soporte técnico y atención</p>
+    </div>
+    
+    @if (currentUserRole === 'Cliente' || currentUserRole === 'Administrador') {
+      <button (click)="showCreateModal.set(true)" class="btn btn-primary">
+        ➕ Crear Solicud
+      </button>
+    }
+  </header>
+
+  <!-- Filtros -->
+  <section class="filters-card">
+    <form [formGroup]="filterForm" (ngSubmit)="loadTickets()" class="filters-form">
+      <div class="filter-group">
+        <label for="search">Buscar</label>
+        <input id="search" type="text" formControlName="search" placeholder="Asunto o ID..." />
+      </div>
+
+      <div class="filter-group">
+        <label for="status">Estado</label>
+        <select id="status" formControlName="status">
+          <option value="">Todos</option>
+          <option value="Abierto">Abierto</option>
+          <option value="En Proceso">En Proceso</option>
+          <option value="Resuelto">Resuelto</option>
+          <option value="Cerrado">Cerrado</option>
+        </select>
+      </div>
+
+      <div class="filter-group">
+        <label for="priority">Prioridad</label>
+        <select id="priority" formControlName="priority">
+          <option value="">Todas</option>
+          <option value="Baja">Baja</option>
+          <option value="Media">Media</option>
+          <option value="Alta">Alta</option>
+          <option value="Urgente">Urgente</option>
+        </select>
+      </div>
+
+      <button type="submit" class="btn btn-secondary">Filtrar</button>
+    </form>
+  </section>
+
+  <!-- Lista de Tickets -->
+  <section class="table-card">
+    @if (errorMessage()) {
+      <div class="alert alert-danger">{{ errorMessage() }}</div>
+    }
+
+    @if (isLoading()) {
+      <div class="loading-state">Cargando solicitudes...</div>
+    } @else {
+      <table class="tickets-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Asunto</th>
+            <th>Cliente</th>
+            <th>Prioridad</th>
+            <th>Estado</th>
+            <th>Agente Asignado</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (ticket of tickets(); track ticket.id) {
+            <tr>
+              <td>#{{ ticket.id }}</td>
+              <td><strong>{{ ticket.title }}</strong></td>
+              <td>{{ ticket.client.name }}</td>
+              <td>
+                <span class="badge" [ngClass]="getPriorityBadge(ticket.priority)">
+                  {{ ticket.priority }}
+                </span>
+              </td>
+              <td>
+                <span class="badge" [ngClass]="getStatusBadge(ticket.status)">
+                  {{ ticket.status }}
+                </span>
+              </td>
+              <td>{{ ticket.assignedAgent?.name || 'Sin Asignar' }}</td>
+              <td>
+                <button (click)="viewDetail(ticket.id)" class="btn-link">
+                  Ver detalle →
+                </button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="7" class="empty-state">No hay solicitudes registradas con estos criterios.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <!-- Paginación -->
+      <footer class="pagination">
+        <button [disabled]="currentPage() === 1" (click)="changePage(currentPage() - 1)" class="btn-page">
+          Anterior
+        </button>
+        <span class="page-info">
+          Página {{ currentPage() }} de {{ totalPages() }} ({{ totalTickets() }} tickets)
+        </span>
+        <button [disabled]="currentPage() === totalPages()" (click)="changePage(currentPage() + 1)" class="btn-page">
+          Siguiente
+        </button>
+      </footer>
+    }
+  </section>
+
+  @if (showCreateModal()) {
+    <app-ticket-create-modal (closeModal)="onModalClosed($event)"></app-ticket-create-modal>
+  }
+</div>

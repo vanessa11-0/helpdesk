@@ -1,29 +1,26 @@
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { AuthService } from '../../../../core/auth/services/auth.service';
+import { AuthService } from '../../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-login',
   templateUrl: './login.component.html',
-  styleUrls: ['./login.component.scss']
+  
 })
 export class LoginComponent {
-  loginForm: FormGroup;
-  isLoading = signal<boolean>(false);
-  errorMessage = signal<string | null>(null);
+  private readonly fb = inject(FormBuilder);
+  private readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
 
-  constructor(
-    private fb: FormBuilder,
-    private authService: AuthService,
-    private router: Router,
-    private route: ActivatedRoute
-  ) {
-    this.loginForm = this.fb.group({
-      email: ['', [Validators.required, Validators.email]],
-      password: ['', [Validators.required, Validators.minLength(6)]]
-    });
-  }
+  readonly isLoading = signal<boolean>(false);
+  readonly errorMessage = signal<string | null>(null);
+
+  readonly loginForm: FormGroup = this.fb.group({
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', [Validators.required, Validators.minLength(6)]]
+  });
 
   onSubmit(): void {
     if (this.loginForm.invalid) {
@@ -42,14 +39,13 @@ export class LoginComponent {
       },
       error: (err) => {
         this.isLoading.set(false);
-        const message = err.error?.message || 'Error al iniciar sesión. Verifique sus credenciales.';
-        this.errorMessage.set(Array.isArray(message) ? message.join(', ') : message);
+        this.errorMessage.set(err?.error?.message || 'Credenciales inválidas. Por favor intente nuevamente.');
       }
     });
   }
-  
-  hasFieldError(field: string): boolean {
-    const control = this.loginForm.get(field);
-    return !!(control && control.invalid && (control.dirty || control.touched));
+
+  isFieldInvalid(fieldName: string): boolean {
+    const field = this.loginForm.get(fieldName);
+    return !!(field && field.invalid && (field.dirty || field.touched));
   }
 }

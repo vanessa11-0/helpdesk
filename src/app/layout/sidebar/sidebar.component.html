@@ -1,0 +1,23 @@
+<aside class="app-sidebar">
+  <nav class="sidebar-nav">
+    <ul>
+      <li>
+        <a routerLink="/dashboard" routerLinkActive="active">
+          📊 Dashboard
+        </a>
+      </li>
+      <li>
+        <a routerLink="/tickets" routerLinkActive="active">
+          🎫 Tickets
+        </a>
+      </li>
+      @if (userRole() === 'Administrador') {
+        <li>
+          <a routerLink="/users" routerLinkActive="active">
+            👥 Usuarios
+          </a>
+        </li>
+      }
+    </ul>
+  </nav>
+</aside>

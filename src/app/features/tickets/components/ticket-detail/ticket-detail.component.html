@@ -1,0 +1,104 @@
+@if (isLoading()) {
+  <div class="loading-state">Cargando detalle del ticket...</div>
+} @else {
+  @if (ticket(); as t) {
+    <div class="ticket-detail-container">
+    <header class="detail-header">
+      <div>
+        <span class="ticket-id">Ticket #{{ t.id }}</span>
+        <h1>{{ t.title }}</h1>
+      </div>
+      <div class="header-actions">
+        @if (currentUser?.role === 'Agente' || currentUser?.role === 'Administrador') {
+          <select [ngModel]="t.status" (ngModelChange)="onStatusChange($event)" class="select-status">
+            <option value="Abierto">Abierto</option>
+            <option value="En Proceso">En Proceso</option>
+            <option value="Resuelto">Resuelto</option>
+            <option value="Cerrado">Cerrado</option>
+          </select>
+        }
+      </div>
+    </header>
+
+    <div class="detail-grid">
+      <!-- Columna Principal: Contenido y Comentarios -->
+      <div class="main-content">
+        <div class="card card-description">
+          <h3>Descripción</h3>
+          <p>{{ t.description }}</p>
+        </div>
+
+        <section class="comments-section">
+          <h3>Historial de Interacciones</h3>
+
+          <div class="comments-list">
+            @for (c of t.comments || []; track c.id) {
+              <div class="comment-card">
+                <div class="comment-meta">
+                  <strong>{{ c.author.name }}</strong>
+                  <span class="role-tag">{{ c.author.role }}</span>
+                  <span class="date">{{ c.createdAt | date:'short' }}</span>
+                </div>
+                <div class="comment-body">{{ c.message }}</div>
+              </div>
+            } @empty {
+              <p class="no-comments">Aún no hay comentarios en este ticket.</p>
+            }
+          </div>
+
+          <!-- Formulario de Comentario -->
+          <div class="add-comment-card">
+            <textarea 
+              rows="3" 
+              [ngModel]="newCommentText()" 
+              (ngModelChange)="newCommentText.set($event)"
+              placeholder="Escribe una respuesta..."
+            ></textarea>
+            <button 
+              class="btn btn-primary" 
+              [disabled]="!newCommentText().trim() || isPostingComment()"
+              (click)="onAddComment()"
+            >
+              {{ isPostingComment() ? 'Enviando...' : 'Responder' }}
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <!-- Columna Lateral: Información -->
+      <aside class="sidebar">
+        <div class="card info-card">
+          <h4>Detalles de la Solicitud</h4>
+
+          <div class="info-item">
+            <span class="label">Cliente:</span>
+            <span class="value">{{ t.client.name }}</span>
+          </div>
+
+          <div class="info-item">
+            <span class="label">Prioridad:</span>
+            <span class="value badge-priority">{{ t.priority }}</span>
+          </div>
+
+          <div class="info-item">
+            <span class="label">Estado Actual:</span>
+            <span class="value">{{ t.status }}</span>
+          </div>
+
+          <div class="info-item">
+            <span class="label">Agente Asignado:</span>
+            <span class="value">{{ t.assignedAgent?.name || 'Pendiente' }}</span>
+          </div>
+
+          <div class="info-item">
+            <span class="label">Fecha Creación:</span>
+            <span class="value">{{ t.createdAt | date:'medium' }}</span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+  } @else {
+    <div class="empty-state">No se encontró el ticket solicitado.</div>
+  }
+}

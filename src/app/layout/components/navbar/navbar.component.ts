@@ -1,19 +1,22 @@
-import { Component } from '@angular/core'
-import { Router } from '@angular/router'
-import { AuthService } from '../../../core/auth/services/auth.service'
+import { Component, inject } from '@angular/core';
+import { AuthService } from '../../../core/auth/auth.service';
 
 @Component({
   selector: 'app-navbar',
-  templateUrl: './navbar.component.html',
-  styleUrls: ['./navbar.component.scss']
+  templateUrl: './navbar.component.html'
 })
 export class NavbarComponent {
-  currentUser = this.authService.currentUser
+  readonly authService = inject(AuthService);
 
-  constructor (private authService: AuthService, private router: Router) {}
+  onLogout(): void {
+    this.authService.logout();
+  }
 
-  onLogout (): void {
-    this.authService.logout()
-    this.router.navigate(['/auth/login'])
+  getRoleBadgeClass(role: string | null): string {
+    switch (role) {
+      case 'ADMIN': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'AGENT': return 'bg-amber-100 text-amber-700 border-amber-200';
+      default: return 'bg-blue-100 text-blue-700 border-blue-200';
+    }
   }
 }

@@ -1,0 +1,74 @@
+<div class="create-ticket-container">
+  <header class="page-header">
+    <h1>Crear Nuevo Ticket</h1>
+    <p class="subtitle">Complete los campos requeridos para abrir una solicitud de soporte</p>
+  </header>
+
+  <section class="form-card">
+    @if (errorMessage()) {
+      <div class="alert alert-danger">{{ errorMessage() }}</div>
+    }
+
+    <form [formGroup]="ticketForm" (ngSubmit)="onSubmit()" class="ticket-form">
+      <!-- Título -->
+      <div class="form-group">
+        <label for="title">Título de la Solicitud *</label>
+        <input 
+          id="title" 
+          type="text" 
+          formControlName="title" 
+          placeholder="Ej: Error al intentar exportar reporte en PDF"
+          [class.is-invalid]="isFieldInvalid('title')"
+        />
+        @if (isFieldInvalid('title')) {
+          <div class="error-message">
+            @if (ticketForm.get('title')?.hasError('required')) { El título es obligatorio. }
+            @if (ticketForm.get('title')?.hasError('minlength')) { Debe contener al menos 5 caracteres. }
+            @if (ticketForm.get('title')?.hasError('maxlength')) { No debe exceder los 100 caracteres. }
+          </div>
+        }
+      </div>
+
+      <!-- Prioridad -->
+      <div class="form-group">
+        <label for="priority">Nivel de Prioridad *</label>
+        <select id="priority" formControlName="priority" [class.is-invalid]="isFieldInvalid('priority')">
+          <option value="low">Baja</option>
+          <option value="medium">Media</option>
+          <option value="high">Alta</option>
+          <option value="urgent">Urgente</option>
+        </select>
+        @if (isFieldInvalid('priority')) {
+          <div class="error-message">Debe seleccionar una prioridad válida.</div>
+        }
+      </div>
+
+      <!-- Descripción -->
+      <div class="form-group">
+        <label for="description">Descripción Detallada *</label>
+        <textarea 
+          id="description" 
+          rows="6" 
+          formControlName="description" 
+          placeholder="Describa de forma clara los pasos para reproducir el inconveniente..."
+          [class.is-invalid]="isFieldInvalid('description')"
+        ></textarea>
+        @if (isFieldInvalid('description')) {
+          <div class="error-message">
+            @if (ticketForm.get('description')?.hasError('required')) { La descripción es obligatoria. }
+            @if (ticketForm.get('description')?.hasError('minlength')) { Proporcione al menos 15 caracteres. }
+            @if (ticketForm.get('description')?.hasError('maxlength')) { No debe exceder los 1000 caracteres. }
+          </div>
+        }
+      </div>
+
+      <!-- Botones de Acción -->
+      <div class="form-actions">
+        <a routerLink="/tickets" class="btn btn-outline">Cancelar</a>
+        <button type="submit" class="btn btn-primary" [disabled]="isSubmitting()">
+          {{ isSubmitting() ? 'Guardando...' : 'Guardar Ticket' }}
+        </button>
+      </div>
+    </form>
+  </section>
+</div>

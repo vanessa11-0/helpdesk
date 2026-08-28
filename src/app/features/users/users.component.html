@@ -1,0 +1,18 @@
+<div class="users-container">
+  <header class="users-header">
+    <div>
+      <h1>Gestión de Usuarios</h1>
+      <p>Administra los permisos y roles de los usuarios registrados.</p>
+    </div>
+  </header>
+
+  @if (isLoading()) {
+    <div class="loading-state">Cargando usuarios...</div>
+  } @else {
+    <app-user-list
+      [users]="users()"
+      (roleChanged)="onRoleChanged($event)"
+      (statusToggled)="onStatusToggled($event)">
+    </app-user-list>
+  }
+</div>
