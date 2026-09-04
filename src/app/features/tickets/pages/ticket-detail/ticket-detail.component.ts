@@ -1,119 +1,295 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { TicketsService } from '../../../../core/services/tickets.service';
-import { AuthService } from '../../../../core/auth/auth.service';
-import { Ticket, TicketStatus, TicketPriority } from '../../../../interfaces/ticket.interface';
-
-interface TimelineComment {
-  id: string;
-  authorName: string;
-  authorRole: string;
-  content: string;
-  createdAt: string;
-  isInternal?: boolean;
-}
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { ActivatedRoute, Router } from '@angular/router';
+import { forkJoin } from 'rxjs';
+import {
+  TICKET_PRIORITIES,
+  TICKET_STATUSES,
+  Ticket,
+  TicketComment,
+  UpdateTicketRequest,
+  User
+} from '@core/models';
+import {
+  EditableTicketField,
+  canAssignTicket,
+  canComment,
+  canDeleteTicket,
+  canUpdateTicket,
+  editableTicketFields
+} from '@core/permissions/ticket-permissions';
+import { AuthService } from '@core/services/auth.service';
+import { TicketService } from '@core/services/ticket.service';
+import { UserService } from '@core/services/user.service';
 
 @Component({
   selector: 'app-ticket-detail',
-  templateUrl: './ticket-detail.component.html',
-
+  templateUrl: './ticket-detail.component.html'
 })
 export class TicketDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
-  private readonly fb = inject(FormBuilder);
-  private readonly ticketsService = inject(TicketsService);
-  readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly ticketService = inject(TicketService);
+  private readonly userService = inject(UserService);
+  private readonly auth = inject(AuthService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  readonly statuses = TICKET_STATUSES;
+  readonly priorities = TICKET_PRIORITIES;
 
   readonly ticket = signal<Ticket | null>(null);
-  readonly isLoading = signal<boolean>(true);
-  readonly isSubmittingComment = signal<boolean>(false);
-  readonly comments = signal<TimelineComment[]>([]);
+  readonly comments = signal<TicketComment[]>([]);
+  readonly agents = signal<User[]>([]);
+  private readonly directory = signal<Record<string, User>>({});
 
-  readonly commentForm: FormGroup = this.fb.group({
-    content: ['', [Validators.required, Validators.minLength(3)]]
+  readonly isLoading = signal(true);
+  readonly loadError = signal<string | null>(null);
+  readonly actionError = signal<string | null>(null);
+  readonly isSaving = signal(false);
+  readonly isAssigning = signal(false);
+  readonly isPostingComment = signal(false);
+
+  private readonly role = this.auth.userRole;
+  private readonly userId = computed(() => this.auth.currentUser()?.id ?? null);
+
+  readonly isAdmin = computed(() => this.role() === 'admin');
+  readonly canEdit = computed(() => canUpdateTicket(this.role(), this.ticket(), this.userId()));
+  readonly canAssign = computed(() => canAssignTicket(this.role()));
+  readonly canDelete = computed(() => canDeleteTicket(this.role()));
+  readonly canAddComment = computed(() => canComment(this.ticket()));
+
+  /** Campos que este rol puede tocar; el formulario se arma sólo con ellos. */
+  readonly editableFields = computed<EditableTicketField[]>(() =>
+    this.canEdit() ? editableTicketFields(this.role()) : []
+  );
+
+  editForm = new FormGroup({});
+  readonly assignControl = new FormControl<string>('', { nonNullable: true });
+  readonly commentControl = new FormControl<string>('', {
+    nonNullable: true,
+    validators: [Validators.required, Validators.minLength(2)]
   });
 
+  /**
+   * Se escucha `paramMap` en lugar de leer el snapshot una sola vez: al ir de
+   * /tickets/t_001 a /tickets/t_004 el router reutiliza esta misma instancia y
+   * con el snapshot se quedarían los datos del ticket anterior en pantalla.
+   */
   ngOnInit(): void {
-    const ticketId = this.route.snapshot.paramMap.get('id');
-    if (ticketId) {
-      this.loadTicketDetails(ticketId);
-    }
+    this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
+      const id = params.get('id');
+      if (!id) {
+        void this.router.navigate(['/tickets']);
+        return;
+      }
+      this.load(id);
+    });
   }
 
-  private loadTicketDetails(id: string): void {
-    this.isLoading.set(true);
+  showsField(field: EditableTicketField): boolean {
+    return this.editableFields().includes(field);
+  }
 
-    // Simulación de respuesta de detalle de ticket e historial
-    setTimeout(() => {
-      this.ticket.set({
-        id,
-        title: 'Error de acceso al módulo de reportes',
-        description: 'Al intentar exportar el reporte mensual en formato PDF, el sistema muestra un error 500 y cierra la sesión activa.',
-        status: 'IN_PROGRESS',
-        priority: 'HIGH',
-        createdBy: { id: '1', fullName: 'Carlos Mendoza', email: 'carlos@ejemplo.com', role: 'CLIENT' },
-        assignedTo: { id: '2', fullName: 'Ana Gómez', email: 'ana@ejemplo.com', role: 'AGENT' },
-        createdAt: '2026-08-27T10:30:00Z',
-        updatedAt: '2026-08-28T08:15:00Z'
-      });
+  /**
+   * El directorio de nombres sólo lo puede cargar un admin. Para el resto de
+   * roles se cae a `fallback` en vez de enseñar el identificador interno.
+   */
+  userName(id: string | null, fallback = 'Sin asignar'): string {
+    if (!id) {
+      return fallback;
+    }
+    if (id === this.userId()) {
+      return 'Yo';
+    }
+    return this.directory()[id]?.name ?? fallback;
+  }
 
-      this.comments.set([
-        {
-          id: 'c1',
-          authorName: 'Carlos Mendoza',
-          authorRole: 'CLIENT',
-          content: 'He adjuntado las capturas del error en el reporte.',
-          createdAt: '2026-08-27T10:35:00Z'
-        },
-        {
-          id: 'c2',
-          authorName: 'Ana Gómez',
-          authorRole: 'AGENT',
-          content: 'Estamos revisando los logs del servidor para identificar la falla en la generación del PDF.',
-          createdAt: '2026-08-28T08:15:00Z'
-        }
-      ]);
+  assignedLabel(assignedTo: string | null): string {
+    return assignedTo === null
+      ? 'Sin asignar'
+      : this.userName(assignedTo, 'Asignado a un agente');
+  }
 
-      this.isLoading.set(false);
-    }, 600);
+  createdByLabel(createdBy: string): string {
+    return this.userName(createdBy, 'Otro usuario');
+  }
+
+  /** Envía sólo los campos que cambiaron, dentro de los permitidos al rol. */
+  onSave(): void {
+    const current = this.ticket();
+    if (!current || this.editForm.invalid) {
+      this.editForm.markAllAsTouched();
+      return;
+    }
+
+    const values = this.editForm.value as UpdateTicketRequest;
+    const changes: UpdateTicketRequest = {};
+    for (const field of this.editableFields()) {
+      const next = values[field];
+      if (next !== undefined && next !== current[field]) {
+        Object.assign(changes, { [field]: next });
+      }
+    }
+
+    if (Object.keys(changes).length === 0) {
+      return;
+    }
+
+    this.isSaving.set(true);
+    this.actionError.set(null);
+
+    this.ticketService.updateTicket(current.id, changes).subscribe({
+      next: (updated) => {
+        this.isSaving.set(false);
+        this.applyTicket(updated);
+      },
+      error: (err: unknown) => {
+        this.isSaving.set(false);
+        this.actionError.set(AuthService.describeError(err, 'No se pudo actualizar el ticket.'));
+      }
+    });
+  }
+
+  onAssign(): void {
+    const current = this.ticket();
+    const agentId = this.assignControl.value;
+    if (!current || !agentId) {
+      return;
+    }
+
+    this.isAssigning.set(true);
+    this.actionError.set(null);
+
+    this.ticketService.assignTicket(current.id, agentId).subscribe({
+      next: (updated) => {
+        this.isAssigning.set(false);
+        this.applyTicket(updated);
+      },
+      error: (err: unknown) => {
+        this.isAssigning.set(false);
+        this.actionError.set(AuthService.describeError(err, 'No se pudo asignar el ticket.'));
+      }
+    });
   }
 
   onAddComment(): void {
-    if (this.commentForm.invalid) return;
+    const current = this.ticket();
+    if (!current || this.commentControl.invalid) {
+      this.commentControl.markAsTouched();
+      return;
+    }
 
-    this.isSubmittingComment.set(true);
-    const content = this.commentForm.value.content;
-    const currentUser = this.authService.currentUser();
+    this.isPostingComment.set(true);
+    this.actionError.set(null);
 
-    setTimeout(() => {
-      const newComment: TimelineComment = {
-        id: `c_${Date.now()}`,
-        authorName: currentUser?.fullName || 'Usuario',
-        authorRole: currentUser?.role || 'CLIENT',
-        content,
-        createdAt: new Date().toISOString()
-      };
-
-      this.comments.update(prev => [...prev, newComment]);
-      this.commentForm.reset();
-      this.isSubmittingComment.set(false);
-    }, 400);
+    this.ticketService.addComment(current.id, this.commentControl.value.trim()).subscribe({
+      next: (comment) => {
+        this.isPostingComment.set(false);
+        this.comments.update((list) => [...list, comment]);
+        this.commentControl.reset('');
+      },
+      error: (err: unknown) => {
+        this.isPostingComment.set(false);
+        this.actionError.set(AuthService.describeError(err, 'No se pudo enviar el comentario.'));
+      }
+    });
   }
 
-  updateStatus(newStatus: TicketStatus): void {
-    if (this.ticket()) {
-      this.ticket.update(t => t ? { ...t, status: newStatus } : null);
+  onDelete(): void {
+    const current = this.ticket();
+    if (!current) {
+      return;
     }
+    if (!confirm('¿Eliminar el ticket "' + current.title + '"? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    this.ticketService.deleteTicket(current.id).subscribe({
+      next: () => void this.router.navigate(['/tickets']),
+      error: (err: unknown) =>
+        this.actionError.set(AuthService.describeError(err, 'No se pudo eliminar el ticket.'))
+    });
   }
 
-  getStatusBadgeClass(status?: TicketStatus): string {
-    switch (status) {
-      case 'OPEN': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'IN_PROGRESS': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'RESOLVED': return 'bg-green-100 text-green-700 border-green-200';
-      case 'CLOSED': return 'bg-gray-100 text-gray-700 border-gray-200';
-      default: return 'bg-gray-100 text-gray-600';
+  private load(id: string): void {
+    this.isLoading.set(true);
+    this.loadError.set(null);
+    // Estado del ticket anterior, por si el router reutiliza el componente.
+    this.actionError.set(null);
+    this.comments.set([]);
+    this.commentControl.reset('');
+
+    forkJoin({
+      ticket: this.ticketService.getTicketById(id),
+      comments: this.ticketService.getComments(id)
+    }).subscribe({
+      next: ({ ticket, comments }) => {
+        this.applyTicket(ticket);
+        this.comments.set(comments);
+        this.isLoading.set(false);
+        this.loadAdminData();
+      },
+      error: (err: unknown) => {
+        this.isLoading.set(false);
+        this.loadError.set(
+          AuthService.describeError(err, 'No se pudo cargar el ticket solicitado.')
+        );
+      }
+    });
+  }
+
+  /** Nombres de usuario y lista de agentes: sólo el admin puede pedirlos. */
+  private loadAdminData(): void {
+    if (!this.isAdmin()) {
+      return;
     }
+    this.userService.getDirectory(true).subscribe({
+      next: (dir) => this.directory.set(dir),
+      error: () => this.directory.set({})
+    });
+    this.userService.getAgents().subscribe({
+      next: (agents) => this.agents.set(agents),
+      error: () => this.agents.set([])
+    });
+  }
+
+  private applyTicket(ticket: Ticket): void {
+    this.ticket.set(ticket);
+    this.assignControl.setValue(ticket.assignedTo ?? '');
+    this.buildEditForm(ticket);
+  }
+
+  /**
+   * El formulario se construye desde cero con los controles que el rol puede
+   * modificar, de modo que la vista no pueda enviar un campo prohibido.
+   */
+  private buildEditForm(ticket: Ticket): void {
+    const controls: Record<string, FormControl> = {};
+
+    for (const field of this.editableFields()) {
+      switch (field) {
+        case 'title':
+          controls['title'] = new FormControl(ticket.title, {
+            nonNullable: true,
+            validators: [Validators.required, Validators.minLength(5)]
+          });
+          break;
+        case 'description':
+          controls['description'] = new FormControl(ticket.description, {
+            nonNullable: true,
+            validators: [Validators.required, Validators.minLength(10)]
+          });
+          break;
+        case 'priority':
+          controls['priority'] = new FormControl(ticket.priority, { nonNullable: true });
+          break;
+        case 'status':
+          controls['status'] = new FormControl(ticket.status, { nonNullable: true });
+          break;
+      }
+    }
+
+    this.editForm = new FormGroup(controls);
   }
 }

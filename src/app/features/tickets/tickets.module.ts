@@ -1,26 +1,12 @@
 import { NgModule } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { ReactiveFormsModule } from '@angular/forms';
-import { RouterModule } from '@angular/router';
-
-import { TicketListComponent } from './pages/ticket-list/ticket-list.component';
-import { TicketDetailComponent } from './pages/ticket-detail/ticket-detail.component';
-import { TicketCreateComponent } from './pages/ticket-create/ticket-create.component';
+import { SharedModule } from '@shared/shared.module';
 import { TicketsRoutingModule } from './tickets-routing.module';
-import { LayoutModule } from '../../layout/layout.module';
+import { TicketCreateComponent } from './pages/ticket-create/ticket-create.component';
+import { TicketDetailComponent } from './pages/ticket-detail/ticket-detail.component';
+import { TicketListComponent } from './pages/ticket-list/ticket-list.component';
 
 @NgModule({
-  declarations: [
-    TicketListComponent,
-    TicketDetailComponent,
-    TicketCreateComponent
-  ],
-  imports: [
-    CommonModule,
-    ReactiveFormsModule,
-    RouterModule,
-    TicketsRoutingModule,
-    LayoutModule
-  ]
+  declarations: [TicketListComponent, TicketDetailComponent, TicketCreateComponent],
+  imports: [SharedModule, TicketsRoutingModule]
 })
-export class TicketsModule { }
+export class TicketsModule {}

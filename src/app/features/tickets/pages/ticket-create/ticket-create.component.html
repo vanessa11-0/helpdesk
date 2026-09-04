@@ -1,130 +1,63 @@
-<div class="max-w-2xl mx-auto space-y-6">
-  <!-- Botón Volver -->
-  <div>
-    <a routerLink="/tickets" class="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-      </svg>
-      Volver al listado
-    </a>
+<div class="max-w-2xl">
+  <div class="mb-6">
+    <a routerLink="/tickets" class="text-sm text-brand-600 hover:text-brand-700">&larr; Volver al listado</a>
+    <h1 class="mt-2 text-2xl font-bold text-gray-900">Nuevo ticket</h1>
+    <p class="text-sm text-gray-500 mt-1">Describe el problema con el mayor detalle posible.</p>
   </div>
 
-  <!-- Tarjeta Principal del Formulario -->
-  <div class="bg-white p-6 sm:p-8 rounded-2xl border border-gray-100 shadow-sm space-y-6">
+  <div *ngIf="errorMessage()" class="mb-5 p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+    {{ errorMessage() }}
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-5">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Crear Nuevo Ticket</h1>
-      <p class="text-sm text-gray-500 mt-1">Completa los campos a continuación para registrar tu solicitud de soporte.</p>
+      <label for="title" class="block text-sm font-medium text-gray-700">Título</label>
+      <input
+        id="title"
+        type="text"
+        formControlName="title"
+        placeholder="La impresora del piso 3 no responde"
+        [ngClass]="{ 'border-red-500': isInvalid('title') }"
+        class="mt-1 block w-full px-4 py-3 rounded-xl border border-gray-300 shadow-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm outline-none"
+      />
+      <p *ngIf="isInvalid('title')" class="mt-1 text-xs text-red-500">El título debe tener al menos 5 caracteres.</p>
     </div>
 
-    <!-- Alerta de Error -->
-    <div *ngIf="errorMessage()" class="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-      {{ errorMessage() }}
+    <div>
+      <label for="priority" class="block text-sm font-medium text-gray-700">Prioridad</label>
+      <select
+        id="priority"
+        formControlName="priority"
+        class="mt-1 block w-full px-4 py-3 rounded-xl border border-gray-300 shadow-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm outline-none bg-white"
+      >
+        <option *ngFor="let p of priorities" [value]="p">{{ p | priorityLabel }}</option>
+      </select>
     </div>
 
-    <form [formGroup]="ticketForm" (ngSubmit)="onSubmit()" class="space-y-5">
-      <!-- Título -->
-      <div>
-        <label for="title" class="block text-xs font-semibold text-gray-700 mb-1">
-          Título del Ticket <span class="text-red-500">*</span>
-        </label>
-        <input 
-          id="title"
-          type="text" 
-          formControlName="title"
-          placeholder="Ej. Problemas de acceso al módulo de facturación"
-          [class.border-red-300]="f['title'].touched && f['title'].invalid"
-          class="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors"
-        />
-        <div *ngIf="f['title'].touched && f['title'].invalid" class="mt-1 text-xs text-red-600">
-          <span *ngIf="f['title'].errors?.['required']">El título es obligatorio.</span>
-          <span *ngIf="f['title'].errors?.['minlength']">El título debe tener al menos 5 caracteres.</span>
-          <span *ngIf="f['title'].errors?.['maxlength']">El título no puede exceder los 100 caracteres.</span>
-        </div>
-      </div>
+    <div>
+      <label for="description" class="block text-sm font-medium text-gray-700">Descripción</label>
+      <textarea
+        id="description"
+        rows="6"
+        formControlName="description"
+        placeholder="¿Qué ocurre, desde cuándo y qué has intentado?"
+        [ngClass]="{ 'border-red-500': isInvalid('description') }"
+        class="mt-1 block w-full px-4 py-3 rounded-xl border border-gray-300 shadow-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-sm outline-none resize-y"
+      ></textarea>
+      <p *ngIf="isInvalid('description')" class="mt-1 text-xs text-red-500">La descripción debe tener al menos 10 caracteres.</p>
+    </div>
 
-      <!-- Categoría y Prioridad (2 Columnas) -->
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <!-- Categoría -->
-        <div>
-          <label for="category" class="block text-xs font-semibold text-gray-700 mb-1">
-            Categoría <span class="text-red-500">*</span>
-          </label>
-          <select 
-            id="category"
-            formControlName="category"
-            [class.border-red-300]="f['category'].touched && f['category'].invalid"
-            class="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors text-gray-700"
-          >
-            <option value="" disabled selected>Selecciona una categoría</option>
-            <option value="TECHNICAL">Soporte Técnico</option>
-            <option value="BILLING">Facturación y Pagos</option>
-            <option value="ACCESS">Acceso y Cuenta</option>
-            <option value="FEATURE">Sugerencia o Mejora</option>
-          </select>
-          <div *ngIf="f['category'].touched && f['category'].invalid" class="mt-1 text-xs text-red-600">
-            <span *ngIf="f['category'].errors?.['required']">Debes seleccionar una categoría.</span>
-          </div>
-        </div>
-
-        <!-- Prioridad -->
-        <div>
-          <label for="priority" class="block text-xs font-semibold text-gray-700 mb-1">
-            Prioridad <span class="text-red-500">*</span>
-          </label>
-          <select 
-            id="priority"
-            formControlName="priority"
-            [class.border-red-300]="f['priority'].touched && f['priority'].invalid"
-            class="w-full px-4 py-2.5 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors text-gray-700"
-          >
-            <option value="LOW">Baja (LOW)</option>
-            <option value="MEDIUM">Media (MEDIUM)</option>
-            <option value="HIGH">Alta (HIGH)</option>
-            <option value="URGENT">Urgente (URGENT)</option>
-          </select>
-        </div>
-      </div>
-
-      <!-- Descripción -->
-      <div>
-        <label for="description" class="block text-xs font-semibold text-gray-700 mb-1">
-          Descripción Detallada <span class="text-red-500">*</span>
-        </label>
-        <textarea 
-          id="description"
-          formControlName="description"
-          rows="5"
-          placeholder="Describe en detalle los pasos para reproducir el problema o la asistencia requerida..."
-          [class.border-red-300]="f['description'].touched && f['description'].invalid"
-          class="w-full p-4 text-sm bg-gray-50 border border-gray-200 rounded-xl focus:bg-white focus:ring-2 focus:ring-brand-500 focus:border-brand-500 outline-none transition-colors resize-none"
-        ></textarea>
-        <div *ngIf="f['description'].touched && f['description'].invalid" class="mt-1 text-xs text-red-600">
-          <span *ngIf="f['description'].errors?.['required']">La descripción es obligatoria.</span>
-          <span *ngIf="f['description'].errors?.['minlength']">La descripción debe tener al menos 20 caracteres.</span>
-          <span *ngIf="f['description'].errors?.['maxlength']">La descripción no puede superar los 1000 caracteres.</span>
-        </div>
-      </div>
-
-      <!-- Acciones de Formulario -->
-      <div class="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-        <a 
-          routerLink="/tickets" 
-          class="px-4 py-2.5 text-sm font-semibold text-gray-600 hover:text-gray-800 transition-colors"
-        >
-          Cancelar
-        </a>
-        <button 
-          type="submit" 
-          [disabled]="isSubmitting()"
-          class="inline-flex items-center gap-2 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <svg *ngIf="isSubmitting()" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          {{ isSubmitting() ? 'Guardando...' : 'Crear Ticket' }}
-        </button>
-      </div>
-    </form>
-  </div>
+    <div class="flex items-center gap-3 pt-2">
+      <button
+        type="submit"
+        [disabled]="isSubmitting()"
+        class="px-5 py-3 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold shadow-sm disabled:opacity-50 transition-colors"
+      >
+        {{ isSubmitting() ? 'Creando...' : 'Crear ticket' }}
+      </button>
+      <a routerLink="/tickets" class="px-5 py-3 rounded-xl border border-gray-300 text-gray-600 text-sm font-medium hover:bg-gray-50">
+        Cancelar
+      </a>
+    </div>
+  </form>
 </div>

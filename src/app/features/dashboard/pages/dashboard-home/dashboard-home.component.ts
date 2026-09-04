@@ -1,58 +1,94 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { AuthService } from '../../../../core/auth/auth.service';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { forkJoin } from 'rxjs';
+import { STATUS_LABELS, TICKET_STATUSES, Ticket, TicketStatus } from '@core/models';
+import { canCreateTicket } from '@core/permissions/ticket-permissions';
+import { AuthService } from '@core/services/auth.service';
+import { TicketService } from '@core/services/ticket.service';
 
 interface MetricCard {
-  title: string;
+  status: TicketStatus;
+  label: string;
   count: number;
-  type: 'open' | 'inProgress' | 'resolved' | 'urgent';
-  description: string;
+  accent: string;
 }
 
 @Component({
   selector: 'app-dashboard-home',
-  templateUrl: './dashboard-home.component.html',
-  
+  templateUrl: './dashboard-home.component.html'
 })
 export class DashboardHomeComponent implements OnInit {
-  readonly authService = inject(AuthService);
+  private readonly ticketService = inject(TicketService);
+  private readonly auth = inject(AuthService);
 
-  readonly isLoading = signal<boolean>(true);
+  readonly user = this.auth.currentUser;
+  readonly role = this.auth.userRole;
+  readonly canCreate = computed(() => canCreateTicket(this.role()));
+
+  readonly isLoading = signal(true);
+  readonly errorMessage = signal<string | null>(null);
+  readonly total = signal(0);
   readonly metrics = signal<MetricCard[]>([]);
+  readonly recentTickets = signal<Ticket[]>([]);
+
+  private readonly accents: Record<TicketStatus, string> = {
+    open: 'border-l-blue-500',
+    in_progress: 'border-l-amber-500',
+    resolved: 'border-l-green-500',
+    closed: 'border-l-gray-400'
+  };
+
+  readonly subtitle = computed(() => {
+    switch (this.role()) {
+      case 'admin':
+        return 'Resumen de todos los tickets del sistema.';
+      case 'agent':
+        return 'Resumen de los tickets asignados a ti y de los que están sin asignar.';
+      default:
+        return 'Resumen de las solicitudes que has reportado.';
+    }
+  });
 
   ngOnInit(): void {
     this.loadMetrics();
   }
 
+  /**
+   * La API no expone un endpoint de métricas, así que los totales se derivan
+   * de /api/tickets: una consulta por estado con `limit=1`, aprovechando que
+   * `meta.total` viene con el conteo completo. Además, el propio backend ya
+   * acota el conjunto al rol, así que los números salen correctos sin lógica
+   * extra en el cliente.
+   */
   private loadMetrics(): void {
-    // Simulación de carga de métricas (sustituir por llamada al servicio de Tickets)
-    setTimeout(() => {
-      this.metrics.set([
-        { title: 'Tickets Abiertos', count: 12, type: 'open', description: 'Pendientes de asignación o revisión' },
-        { title: 'En Progreso', count: 5, type: 'inProgress', description: 'En gestión activa por un agente' },
-        { title: 'Resueltos', count: 28, type: 'resolved', description: 'Solucionados exitosamente' },
-        { title: 'Urgentes', count: 2, type: 'urgent', description: 'Requieren atención prioritaria' }
-      ]);
-      this.isLoading.set(false);
-    }, 800);
-  }
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
 
-  getCardBorderClass(type: string): string {
-    switch (type) {
-      case 'open': return 'border-l-4 border-l-blue-500';
-      case 'inProgress': return 'border-l-4 border-l-amber-500';
-      case 'resolved': return 'border-l-4 border-l-green-500';
-      case 'urgent': return 'border-l-4 border-l-red-500';
-      default: return 'border-l-4 border-l-gray-300';
-    }
-  }
-
-  getBadgeClass(type: string): string {
-    switch (type) {
-      case 'open': return 'bg-blue-50 text-blue-700';
-      case 'inProgress': return 'bg-amber-50 text-amber-700';
-      case 'resolved': return 'bg-green-50 text-green-700';
-      case 'urgent': return 'bg-red-50 text-red-700';
-      default: return 'bg-gray-50 text-gray-700';
-    }
+    forkJoin({
+      recent: this.ticketService.getTickets({ page: 1, limit: 5 }),
+      open: this.ticketService.getTickets({ status: 'open', limit: 1 }),
+      in_progress: this.ticketService.getTickets({ status: 'in_progress', limit: 1 }),
+      resolved: this.ticketService.getTickets({ status: 'resolved', limit: 1 }),
+      closed: this.ticketService.getTickets({ status: 'closed', limit: 1 })
+    }).subscribe({
+      next: (res) => {
+        this.total.set(res.recent.meta.total);
+        this.recentTickets.set(res.recent.data);
+        this.metrics.set(
+          TICKET_STATUSES.map((status) => ({
+            status,
+            label: STATUS_LABELS[status],
+            count: res[status].meta.total,
+            accent: this.accents[status]
+          }))
+        );
+        this.isLoading.set(false);
+      },
+      error: (err: unknown) => {
+        this.isLoading.set(false);
+        this.errorMessage.set(
+          AuthService.describeError(err, 'No se pudieron cargar las métricas.')
+        );
+      }
+    });
   }
 }

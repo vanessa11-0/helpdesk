@@ -1,16 +1,21 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { AuthService } from '../auth/auth.service';
+import { AuthService } from '@core/services/auth.service';
 
-export const authGuard: CanActivateFn = (route, state) => {
-  const authService = inject(AuthService);
+/**
+ * Hay sesión válida cuando existen un access token y un usuario en el estado
+ * del AuthService (rehidratado desde localStorage al arrancar). El guard no
+ * verifica la firma ni la expiración del token: de eso se encarga la API con
+ * un 401, que el interceptor de renovación convierte en un refresh.
+ */
+export const authGuard: CanActivateFn = (_route, state) => {
+  const auth = inject(AuthService);
   const router = inject(Router);
 
-  if (authService.isAuthenticated()) {
+  if (auth.isAuthenticated()) {
     return true;
   }
 
-  // Redirigir a login guardando la URL intentada como queryParam
   return router.createUrlTree(['/auth/login'], {
     queryParams: { returnUrl: state.url }
   });

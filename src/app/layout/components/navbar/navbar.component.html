@@ -1,28 +1,27 @@
-<header class="h-16 bg-white border-b border-gray-100 px-6 flex items-center justify-between sticky top-0 z-20">
-  <div class="flex items-center gap-3">
-    <h1 class="text-lg font-semibold text-gray-800">Mesa de Ayuda</h1>
-  </div>
+<header class="h-16 bg-white border-b border-gray-100 px-4 md:px-6 flex items-center justify-between sticky top-0 z-20">
+  <h1 class="text-lg font-semibold text-gray-800">Mesa de Ayuda</h1>
 
-  <div class="flex items-center gap-4" *ngIf="authService.currentUser() as user">
-    <!-- Rol Badge -->
-    <span [class]="getRoleBadgeClass(user.role)" class="px-2.5 py-1 text-xs font-semibold rounded-full border">
-      {{ user.role }}
+  <div class="flex items-center gap-3 md:gap-4" *ngIf="auth.currentUser() as user">
+    <span
+      [class]="user.role | roleBadge"
+      class="px-2.5 py-1 text-xs font-semibold rounded-full border"
+    >
+      {{ user.role | roleLabel }}
     </span>
 
-    <!-- Perfil del usuario -->
-    <div class="flex items-center gap-3 border-l border-gray-100 pl-4">
+    <div class="flex items-center gap-3 border-l border-gray-100 pl-3 md:pl-4">
       <div class="w-9 h-9 rounded-full bg-brand-500 text-white flex items-center justify-center font-bold text-sm shadow-sm">
-        {{ user.fullName.charAt(0).toUpperCase() }}
+        {{ user.name.charAt(0).toUpperCase() }}
       </div>
       <div class="hidden md:block text-left">
-        <p class="text-sm font-medium text-gray-900 leading-tight">{{ user.fullName }}</p>
+        <p class="text-sm font-medium text-gray-900 leading-tight">{{ user.name }}</p>
         <p class="text-xs text-gray-400">{{ user.email }}</p>
       </div>
     </div>
 
-    <!-- Botón Cerrar Sesión -->
-    <button 
-      (click)="onLogout()" 
+    <button
+      type="button"
+      (click)="onLogout()"
       title="Cerrar sesión"
       class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
     >

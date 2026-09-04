@@ -1,93 +1,145 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
-import { FormBuilder, FormGroup } from '@angular/forms';
-import { TicketsService } from '../../../../core/services/tickets.service';
-import { AuthService } from '../../../../core/auth/auth.service';
-import { Ticket, TicketStatus, TicketPriority, TicketFilter } from '../../../../interfaces/ticket.interface';
-import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormBuilder } from '@angular/forms';
+import {
+  PaginationMeta,
+  TICKET_PRIORITIES,
+  TICKET_STATUSES,
+  Ticket,
+  TicketFilters,
+  TicketPriority,
+  TicketStatus,
+  User
+} from '@core/models';
+import { canCreateTicket } from '@core/permissions/ticket-permissions';
+import { AuthService } from '@core/services/auth.service';
+import { TicketService } from '@core/services/ticket.service';
+import { UserService } from '@core/services/user.service';
+
+/** Vista del agente sobre su bandeja; la API no ofrece este filtro. */
+type AgentScope = 'all' | 'mine' | 'unassigned';
+
+const PAGE_SIZE = 10;
 
 @Component({
   selector: 'app-ticket-list',
-  templateUrl: './ticket-list.component.html',
-
+  templateUrl: './ticket-list.component.html'
 })
 export class TicketListComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
-  private readonly ticketsService = inject(TicketsService);
-  readonly authService = inject(AuthService);
+  private readonly ticketService = inject(TicketService);
+  private readonly userService = inject(UserService);
+  private readonly auth = inject(AuthService);
+
+  readonly statuses = TICKET_STATUSES;
+  readonly priorities = TICKET_PRIORITIES;
 
   readonly tickets = signal<Ticket[]>([]);
-  readonly isLoading = signal<boolean>(true);
-  readonly totalItems = signal<number>(0);
-  readonly totalPages = signal<number>(1);
-  readonly currentPage = signal<number>(1);
+  readonly meta = signal<PaginationMeta>({ total: 0, page: 1, limit: PAGE_SIZE, totalPages: 1 });
+  readonly isLoading = signal(true);
+  readonly errorMessage = signal<string | null>(null);
+  readonly agentScope = signal<AgentScope>('all');
 
-  readonly filterForm: FormGroup = this.fb.group({
-    search: [''],
+  /** id → usuario, para mostrar nombres en lugar de `u_client1`. */
+  private readonly directory = signal<Record<string, User>>({});
+
+  readonly role = this.auth.userRole;
+  readonly currentUserId = computed(() => this.auth.currentUser()?.id ?? null);
+  readonly isAgent = computed(() => this.role() === 'agent');
+  readonly isAdmin = computed(() => this.role() === 'admin');
+  readonly canCreate = computed(() => canCreateTicket(this.role()));
+
+  readonly filterForm = this.fb.nonNullable.group({
     status: [''],
     priority: ['']
   });
 
-  ngOnInit(): void {
-    this.fetchTickets();
+  /**
+   * El filtro por asignación se aplica sobre la página ya recibida: la API
+   * pagina en el servidor y no acepta un parámetro `assignedTo`.
+   */
+  readonly visibleTickets = computed(() => {
+    const scope = this.agentScope();
+    const all = this.tickets();
+    if (!this.isAgent() || scope === 'all') {
+      return all;
+    }
+    const me = this.currentUserId();
+    return scope === 'mine'
+      ? all.filter((t) => t.assignedTo === me)
+      : all.filter((t) => t.assignedTo === null);
+  });
 
-    // Escuchar cambios de filtros con debounce para evitar llamadas excesivas a la API
-    this.filterForm.valueChanges
-      .pipe(debounceTime(300), distinctUntilChanged())
-      .subscribe(() => {
-        this.currentPage.set(1);
-        this.fetchTickets();
-      });
+  readonly pages = computed(() =>
+    Array.from({ length: this.meta().totalPages }, (_, i) => i + 1)
+  );
+
+  ngOnInit(): void {
+    // Sólo el admin puede consultar /api/users para resolver los nombres.
+    this.userService.getDirectory(this.isAdmin()).subscribe({
+      next: (dir) => this.directory.set(dir),
+      error: () => this.directory.set({})
+    });
+
+    this.loadTickets(1);
   }
 
-  fetchTickets(): void {
-    this.isLoading.set(true);
-    const formValues = this.filterForm.value;
+  applyFilters(): void {
+    this.loadTickets(1);
+  }
 
-    const queryFilters: TicketFilter = {
-      search: formValues.search,
-      status: formValues.status,
-      priority: formValues.priority,
-      page: this.currentPage(),
-      limit: 10
+  clearFilters(): void {
+    this.filterForm.reset({ status: '', priority: '' });
+    this.agentScope.set('all');
+    this.loadTickets(1);
+  }
+
+  goToPage(page: number): void {
+    if (page >= 1 && page <= this.meta().totalPages && page !== this.meta().page) {
+      this.loadTickets(page);
+    }
+  }
+
+  setScope(scope: AgentScope): void {
+    this.agentScope.set(scope);
+  }
+
+  /**
+   * Sólo el admin puede resolver los IDs a nombres; para los demás roles se
+   * muestra una etiqueta genérica en lugar de un identificador interno.
+   */
+  assignedLabel(assignedTo: string | null): string {
+    if (!assignedTo) {
+      return 'Sin asignar';
+    }
+    if (assignedTo === this.currentUserId()) {
+      return 'Yo';
+    }
+    return this.directory()[assignedTo]?.name ?? 'Asignado a un agente';
+  }
+
+  private loadTickets(page: number): void {
+    this.isLoading.set(true);
+    this.errorMessage.set(null);
+
+    const { status, priority } = this.filterForm.getRawValue();
+    const filters: TicketFilters = {
+      status: status as TicketStatus | '',
+      priority: priority as TicketPriority | '',
+      page,
+      limit: PAGE_SIZE
     };
 
-    this.ticketsService.getTickets(queryFilters).subscribe({
+    this.ticketService.getTickets(filters).subscribe({
       next: (res) => {
         this.tickets.set(res.data);
-        this.totalItems.set(res.total);
-        this.totalPages.set(res.totalPages);
+        this.meta.set(res.meta);
         this.isLoading.set(false);
       },
-      error: () => {
+      error: (err: unknown) => {
+        this.tickets.set([]);
+        this.errorMessage.set(AuthService.describeError(err, 'No se pudieron cargar los tickets.'));
         this.isLoading.set(false);
       }
     });
-  }
-
-  changePage(newPage: number): void {
-    if (newPage >= 1 && newPage <= this.totalPages()) {
-      this.currentPage.set(newPage);
-      this.fetchTickets();
-    }
-  }
-
-  getStatusBadgeClass(status: TicketStatus): string {
-    switch (status) {
-      case 'OPEN': return 'bg-blue-100 text-blue-700 border-blue-200';
-      case 'IN_PROGRESS': return 'bg-amber-100 text-amber-700 border-amber-200';
-      case 'RESOLVED': return 'bg-green-100 text-green-700 border-green-200';
-      case 'CLOSED': return 'bg-gray-100 text-gray-700 border-gray-200';
-      default: return 'bg-gray-100 text-gray-600';
-    }
-  }
-
-  getPriorityBadgeClass(priority: TicketPriority): string {
-    switch (priority) {
-      case 'LOW': return 'bg-gray-100 text-gray-600';
-      case 'MEDIUM': return 'bg-blue-50 text-blue-600 border-blue-100';
-      case 'HIGH': return 'bg-orange-50 text-orange-600 border-orange-100';
-      case 'URGENT': return 'bg-red-50 text-red-600 border-red-100 font-semibold';
-      default: return 'bg-gray-100 text-gray-600';
-    }
   }
 }

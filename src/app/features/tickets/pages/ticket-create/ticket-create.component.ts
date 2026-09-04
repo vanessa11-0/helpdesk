@@ -1,49 +1,53 @@
 import { Component, inject, signal } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { FormBuilder, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
-import { TicketsService } from '../../../../core/services/tickets.service';
+import { TICKET_PRIORITIES, TicketPriority } from '@core/models';
+import { AuthService } from '@core/services/auth.service';
+import { TicketService } from '@core/services/ticket.service';
 
 @Component({
   selector: 'app-ticket-create',
-  templateUrl: './ticket-create.component.html',
-
+  templateUrl: './ticket-create.component.html'
 })
 export class TicketCreateComponent {
   private readonly fb = inject(FormBuilder);
-  private readonly ticketsService = inject(TicketsService);
+  private readonly tickets = inject(TicketService);
   private readonly router = inject(Router);
 
-  readonly isSubmitting = signal<boolean>(false);
+  readonly priorities = TICKET_PRIORITIES;
+  readonly isSubmitting = signal(false);
   readonly errorMessage = signal<string | null>(null);
 
-  readonly ticketForm: FormGroup = this.fb.group({
-    title: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(100)]],
-    category: ['', [Validators.required]],
-    priority: ['MEDIUM', [Validators.required]],
-    description: ['', [Validators.required, Validators.minLength(20), Validators.maxLength(1000)]]
+  /** Los mínimos replican los que valida la API (5 y 10 caracteres). */
+  readonly form = this.fb.nonNullable.group({
+    title: ['', [Validators.required, Validators.minLength(5), Validators.maxLength(120)]],
+    description: ['', [Validators.required, Validators.minLength(10), Validators.maxLength(1000)]],
+    priority: ['medium' as TicketPriority, [Validators.required]]
   });
 
-  // Helpers para acceder a los controles desde el HTML
-  get f() {
-    return this.ticketForm.controls;
-  }
-
   onSubmit(): void {
-    if (this.ticketForm.invalid) {
-      this.ticketForm.markAllAsTouched();
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
       return;
     }
 
     this.isSubmitting.set(true);
     this.errorMessage.set(null);
 
-    const formData = this.ticketForm.value;
+    this.tickets.createTicket(this.form.getRawValue()).subscribe({
+      next: (ticket) => {
+        this.isSubmitting.set(false);
+        void this.router.navigate(['/tickets', ticket.id]);
+      },
+      error: (err: unknown) => {
+        this.isSubmitting.set(false);
+        this.errorMessage.set(AuthService.describeError(err, 'No se pudo crear el ticket.'));
+      }
+    });
+  }
 
-    // Simulación de envío de datos al backend (Sustituir por integración real con TicketsService)
-    setTimeout(() => {
-      this.isSubmitting.set(false);
-      // Redirigir al listado tras creación exitosa
-      this.router.navigate(['/tickets']);
-    }, 800);
+  isInvalid(field: 'title' | 'description'): boolean {
+    const control = this.form.controls[field];
+    return control.invalid && (control.dirty || control.touched);
   }
 }
