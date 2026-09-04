@@ -1,21 +1,21 @@
 import { NgModule, Optional, SkipSelf } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { jwtInterceptor } from './interceptors/jwt.interceptor';
-import { refreshTokenInterceptor } from './interceptors/refresh-token.interceptor';
+import { authInterceptor } from './interceptors/auth.interceptor';
+import { refreshInterceptor } from './interceptors/refresh.interceptor';
 
+/**
+ * El orden importa: authInterceptor firma la petición y refreshInterceptor,
+ * al quedar más cerca del backend, es el primero en ver el 401 de respuesta.
+ */
 @NgModule({
   imports: [CommonModule],
-  providers: [
-    provideHttpClient(
-      withInterceptors([jwtInterceptor, refreshTokenInterceptor])
-    )
-  ]
+  providers: [provideHttpClient(withInterceptors([authInterceptor, refreshInterceptor]))]
 })
 export class CoreModule {
-  constructor(@Optional() @SkipSelf() parentModule: CoreModule) {
-    if (parentModule) {
-      throw new Error('CoreModule ya ha sido cargado. Impórtalo únicamente en AppModule.');
+  constructor(@Optional() @SkipSelf() parent?: CoreModule) {
+    if (parent) {
+      throw new Error('CoreModule ya fue cargado. Impórtalo únicamente en AppModule.');
     }
   }
 }

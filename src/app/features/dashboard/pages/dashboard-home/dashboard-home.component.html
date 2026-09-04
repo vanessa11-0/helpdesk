@@ -1,58 +1,76 @@
 <div class="space-y-6">
-  <!-- Saludo de bienvenida -->
+
   <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-bold text-gray-900">
-        Hola, {{ authService.currentUser()?.fullName }} 👋
-      </h1>
-      <p class="text-sm text-gray-500 mt-1">
-        Resumen general del estado de las solicitudes de soporte.
-      </p>
+      <h1 class="text-2xl font-bold text-gray-900">Hola, {{ user()?.name }} 👋</h1>
+      <p class="text-sm text-gray-500 mt-1">{{ subtitle() }}</p>
     </div>
 
-    <div *ngIf="authService.userRole() === 'CLIENT'">
-      <a 
-        routerLink="/tickets/create" 
-        class="inline-flex items-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
-      >
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
-        </svg>
-        Nuevo Ticket
-      </a>
-    </div>
+    <a
+      *ngIf="canCreate()"
+      routerLink="/tickets/create"
+      class="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-colors"
+    >
+      Nuevo ticket
+    </a>
   </div>
 
-  <!-- State Loader: Skeletons -->
+  <div *ngIf="errorMessage()" class="p-4 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm">
+    {{ errorMessage() }}
+  </div>
+
+  <!-- Cargando -->
   <div *ngIf="isLoading()" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-    <div *ngFor="let i of [1,2,3,4]" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm animate-pulse space-y-3">
+    <div *ngFor="let i of [1, 2, 3, 4]" class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm animate-pulse space-y-3">
       <div class="h-4 bg-gray-200 rounded w-1/2"></div>
       <div class="h-8 bg-gray-200 rounded w-1/4"></div>
-      <div class="h-3 bg-gray-100 rounded w-3/4"></div>
     </div>
   </div>
 
-  <!-- Metric Cards Grid -->
-  <div *ngIf="!isLoading()" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-    <div 
-      *ngFor="let metric of metrics()" 
-      [class]="getCardBorderClass(metric.type)"
-      class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow"
-    >
-      <div class="flex items-center justify-between">
-        <span class="text-sm font-medium text-gray-500">{{ metric.title }}</span>
-        <span [class]="getBadgeClass(metric.type)" class="p-2 rounded-xl">
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        </span>
-      </div>
-
-      <div class="mt-4 flex items-baseline gap-2">
-        <span class="text-3xl font-extrabold text-gray-900 tracking-tight">{{ metric.count }}</span>
-      </div>
-
-      <p class="mt-2 text-xs text-gray-400">{{ metric.description }}</p>
+  <ng-container *ngIf="!isLoading()">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <a
+        *ngFor="let metric of metrics()"
+        [routerLink]="['/tickets']"
+        [class]="metric.accent"
+        class="bg-white p-6 rounded-2xl border border-gray-100 border-l-4 shadow-sm hover:shadow-md transition-shadow"
+      >
+        <span class="text-sm font-medium text-gray-500">{{ metric.label }}</span>
+        <p class="mt-3 text-3xl font-extrabold text-gray-900 tracking-tight">{{ metric.count }}</p>
+      </a>
     </div>
-  </div>
+
+    <p class="text-sm text-gray-500">{{ total() }} ticket(s) visibles para tu rol.</p>
+
+    <!-- Últimos tickets -->
+    <section class="bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-900">Últimos tickets</h2>
+        <a routerLink="/tickets" class="text-sm text-brand-600 hover:text-brand-700">Ver todos</a>
+      </div>
+
+      <p *ngIf="recentTickets().length === 0" class="px-6 py-8 text-sm text-gray-400 text-center">
+        Todavía no hay tickets para mostrar.
+      </p>
+
+      <ul class="divide-y divide-gray-100">
+        <li *ngFor="let ticket of recentTickets()">
+          <a [routerLink]="['/tickets', ticket.id]" class="flex flex-wrap items-center justify-between gap-3 px-6 py-4 hover:bg-gray-50 transition-colors">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900 truncate">{{ ticket.title }}</p>
+              <p class="text-xs text-gray-400 mt-0.5">{{ ticket.updatedAt | date: 'dd/MM/yyyy HH:mm' }}</p>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              <span [class]="ticket.status | statusBadge" class="px-2.5 py-1 text-xs rounded-full border">
+                {{ ticket.status | statusLabel }}
+              </span>
+              <span [class]="ticket.priority | priorityBadge" class="px-2.5 py-1 text-xs rounded-full border">
+                {{ ticket.priority | priorityLabel }}
+              </span>
+            </div>
+          </a>
+        </li>
+      </ul>
+    </section>
+  </ng-container>
 </div>

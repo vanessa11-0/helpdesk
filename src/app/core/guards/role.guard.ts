@@ -1,19 +1,22 @@
 import { inject } from '@angular/core';
 import { CanActivateFn, Router } from '@angular/router';
-import { AuthService } from '../auth/auth.service';
-import { UserRole } from '../models/user.model';
+import { UserRole } from '@core/models';
+import { AuthService } from '@core/services/auth.service';
 
+/**
+ * Restringe una ruta a los roles declarados en `data.roles`.
+ * Se ejecuta después de authGuard, así que aquí ya hay sesión: si el rol no
+ * encaja es un 403 conceptual, no un 401, y por eso lleva a /unauthorized en
+ * lugar de al login.
+ */
 export const roleGuard: CanActivateFn = (route) => {
-  const authService = inject(AuthService);
+  const auth = inject(AuthService);
   const router = inject(Router);
 
-  const allowedRoles = route.data['roles'] as Array<UserRole> | undefined;
-  const currentRole = authService.userRole();
-
-  if (currentRole && allowedRoles && allowedRoles.includes(currentRole)) {
+  const allowed = route.data['roles'] as UserRole[] | undefined;
+  if (!allowed?.length) {
     return true;
   }
 
-  // Si no tiene los permisos suficientes, redirigir al Dashboard principal
-  return router.createUrlTree(['/dashboard']);
+  return auth.hasRole(...allowed) ? true : router.createUrlTree(['/unauthorized']);
 };
